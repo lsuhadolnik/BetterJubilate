@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>Songbook with Chords</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <style>
     :root {
       --bg: #0f172a;
@@ -16,7 +16,7 @@
       --danger: #ef4444;
     }
 
-    * { box-sizing: border-box; }
+    * { box-sizing: border-box; touch-action: manipulation; }
     body {
       margin: 0;
       font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
@@ -141,10 +141,10 @@
     .lyrics { margin-top: 18px; font-size: 16px; display: flex; flex-direction: column; gap: 6px; }
     .line { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 2px; white-space: pre-wrap; }
     .line.empty { height: 12px; }
-    .chord-wrap { display: inline-flex; flex-direction: column; position: relative; padding-top: 16px; border-bottom: 1px solid #666; line-height: 1.35; }
+    .chord-wrap { display: inline-flex; flex-direction: column; position: relative; padding-top: 16px; border-bottom: 1px solid #666; line-height: 2.35; }
     .chord-wrap + .chord-wrap { margin-left: 0; }
-    .chord-badge { position: absolute; top: 0; left: 0; display: inline-block; padding: 2px 5px; background: #f5d5b8; color: #0f172a; font-weight: 700; font-size: 0.85em; border-radius: 4px; line-height: 1; }
-    .lyric-text { color: var(--text); white-space: pre; }
+    .chord-badge { position: absolute; top: 0; left: 0; display: inline-block; padding: 2px 5px; background: #f5d5b8; color: #0f172a; font-weight: 700; font-size: 0.85em; border-radius: 4px; line-height: 1; white-space: nowrap; }
+    .lyric-text { color: var(--text); white-space: pre; padding-left: 4px; }
     .chunk-plain { display: inline-block; color: var(--text); white-space: pre; line-height: 1.6; }
 
     .video-link { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); text-decoration: none; font-weight: 600; margin-top: 10px; }
@@ -154,8 +154,9 @@
       position: fixed;
       right: 16px;
       bottom: 16px;
-      display: grid;
+      display: flex;
       gap: 8px;
+      align-items: center;
       z-index: 10;
     }
 
@@ -168,6 +169,40 @@
       cursor: pointer;
     }
     .ghost-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+    .ghost-btn.sm { padding: 6px 10px; }
+
+    .song-top { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
+    .header-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .font-controls { display: flex; gap: 6px; align-items: center; }
+    .scroll-step {
+      width: 90px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+    }
+    .scroll-indicator {
+      position: fixed;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: var(--accent);
+      opacity: 0.5;
+      pointer-events: none;
+      z-index: 9;
+    }
+    .scroll-indicator span {
+      position: absolute;
+      right: 12px;
+      top: -10px;
+      background: var(--panel-2);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 2px 6px;
+      font-size: 12px;
+    }
 
     .toast {
       position: fixed;
@@ -199,7 +234,7 @@
   </style>
 </head>
 <body>
-  <div class="app" id="app">
+  <div class="app list-hidden" id="app">
     <aside>
       <input class="search" id="search" type="search" placeholder="Search title or tag..." aria-label="Search songs">
       <div class="pill-row">
@@ -222,7 +257,6 @@
   </div>
 
   <div class="floating-controls">
-    <button id="toggle-list" class="ghost-btn">Hide songs</button>
     <button id="prev-song" class="ghost-btn" disabled>Prev</button>
     <button id="next-song" class="ghost-btn" disabled>Next</button>
   </div>
@@ -231,6 +265,9 @@
     <span id="toast-text">Added to playlist.</span>
     <button id="toast-action" class="mini-btn">Change playlist</button>
   </div>
+
+  <div class="scroll-indicator" id="indicator-down"><span>Next ↓</span></div>
+  <div class="scroll-indicator" id="indicator-up"><span>Prev ↑</span></div>
 
   <div class="overlay" id="playlist-modal">
     <div class="modal">
@@ -252,7 +289,7 @@
     const playlistListEl = document.getElementById("playlist-list");
     const searchEl = document.getElementById("search");
     const cardEl = document.getElementById("song-card");
-    const toggleListBtn = document.getElementById("toggle-list");
+    let toggleListBtn = document.getElementById("toggle-list");
     const prevBtn = document.getElementById("prev-song");
     const nextBtn = document.getElementById("next-song");
     const tabSongsBtn = document.getElementById("tab-songs");
@@ -276,8 +313,70 @@
     let selectedPlaylistId = null;
     let playlistIndex = 0;
     let toastTimeout;
+    let fontScale = 1;
+    let scrollStep = 140;
 
     const chordRegex = /\{\{([^{}]+)\}\}|\{([^{}]+)\}/g;
+
+    const indicatorDown = document.getElementById("indicator-down");
+    const indicatorUp = document.getElementById("indicator-up");
+
+    const applyFontSize = () => {
+      const lyricsEl = document.getElementById("lyrics");
+      if (lyricsEl) lyricsEl.style.fontSize = `${(16 * fontScale).toFixed(1)}px`;
+      localStorage.setItem("songbookFontScale", fontScale.toString());
+    };
+
+    const syncToggleListLabel = () => {
+      if (!toggleListBtn) return;
+      toggleListBtn.textContent = appEl.classList.contains("list-hidden") ? "Show songs" : "Hide songs";
+    };
+
+    const updateScrollIndicators = () => {
+      const maxDown = Math.max(0, document.documentElement.scrollHeight - window.innerHeight - window.scrollY);
+      const downOffset = Math.min(scrollStep, maxDown);
+      const upOffset = Math.min(scrollStep, window.scrollY);
+      if (indicatorDown) {
+        indicatorDown.style.top = `${downOffset}px`;
+        indicatorDown.style.opacity = downOffset > 0 ? 0.6 : 0;
+      }
+      if (indicatorUp) {
+        indicatorUp.style.top = `${Math.max(0, window.innerHeight - upOffset)}px`;
+        indicatorUp.style.opacity = upOffset > 0 ? 0.6 : 0;
+      }
+    };
+
+    const bindCardControls = () => {
+      toggleListBtn = document.getElementById("toggle-list");
+      if (toggleListBtn) {
+        toggleListBtn.onclick = () => {
+          const hidden = appEl.classList.toggle("list-hidden");
+          syncToggleListLabel();
+        };
+        syncToggleListLabel();
+      }
+
+      const fontInc = document.getElementById("font-inc");
+      const fontDec = document.getElementById("font-dec");
+      const fontReset = document.getElementById("font-reset");
+      if (fontInc) fontInc.onclick = () => { fontScale = Math.min(1.6, fontScale + 0.1); applyFontSize(); };
+      if (fontDec) fontDec.onclick = () => { fontScale = Math.max(0.8, fontScale - 0.1); applyFontSize(); };
+      if (fontReset) fontReset.onclick = () => { fontScale = 1; applyFontSize(); };
+      const stepInput = document.getElementById("scroll-step");
+      if (stepInput) {
+        stepInput.value = scrollStep;
+        stepInput.onchange = () => {
+          const val = parseInt(stepInput.value, 10);
+          if (!Number.isNaN(val) && val > 0) {
+            scrollStep = val;
+            saveState();
+            updateScrollIndicators();
+          }
+        };
+      }
+      applyFontSize();
+      updateScrollIndicators();
+    };
 
     const escapeHtml = (str) => (str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
@@ -327,6 +426,7 @@
       localStorage.setItem("songbookPlaylists", JSON.stringify(playlists));
       localStorage.setItem("songbookDefaultPlaylist", defaultPlaylistId || "");
       localStorage.setItem("songbookSelectedPlaylist", selectedPlaylistId || "");
+      localStorage.setItem("songbookScrollStep", scrollStep.toString());
     };
 
     const loadState = () => {
@@ -338,6 +438,10 @@
       }
       defaultPlaylistId = localStorage.getItem("songbookDefaultPlaylist") || null;
       selectedPlaylistId = localStorage.getItem("songbookSelectedPlaylist") || null;
+      const storedScale = parseFloat(localStorage.getItem("songbookFontScale"));
+      if (!Number.isNaN(storedScale)) fontScale = storedScale;
+      const storedStep = parseInt(localStorage.getItem("songbookScrollStep"), 10);
+      if (!Number.isNaN(storedStep)) scrollStep = storedStep;
     };
 
     const getPlaylistById = (id) => playlists.find((p) => p.id === id);
@@ -356,21 +460,33 @@
       });
 
       const lyricsHtml = formatLyrics(song.lyrics);
+      const listLabel = appEl.classList.contains("list-hidden") ? "Show songs" : "Hide songs";
       cardEl.innerHTML = `
-        <div>
-          <h2 style="margin:0 0 4px;">${song.title || "Untitled"}</h2>
-          <div class="subtitle">${song.author || "Unknown author"}</div>
-          <div class="meta-grid">
-            <div><strong>Key:</strong> ${song.music_key || "?"}</div>
-            <div><strong>Rhythm:</strong> ${song.rhythm || "?"}</div>
-            <div><strong>Page:</strong> ${song.page || "-"}</div>
-            <div><strong>Tags:</strong> ${song.tags || "-"}</div>
-            <div><strong>Categories:</strong> ${song.categories || "-"}</div>
-            <div><strong>Published:</strong> ${song.published || "-"}</div>
+        <div class="song-top">
+          <div>
+            <h2 style="margin:0 0 4px;">${song.title || "Untitled"}</h2>
+            <div class="subtitle">${song.author || "Unknown author"}</div>
           </div>
-          ${song.video ? `<a class="video-link" href="${song.video}" target="_blank" rel="noreferrer">▶ Watch</a>` : ""}
-          <div class="lyrics">${lyricsHtml}</div>
+          <div class="header-actions">
+            <button id="toggle-list" class="ghost-btn sm">${listLabel}</button>
+            <div class="font-controls">
+              <button id="font-dec" class="ghost-btn sm">A-</button>
+              <button id="font-reset" class="ghost-btn sm">A</button>
+              <button id="font-inc" class="ghost-btn sm">A+</button>
+            </div>
+            <input id="scroll-step" class="scroll-step" type="number" min="20" max="1000" step="10" aria-label="Scroll step (px)">
+          </div>
         </div>
+        <div class="meta-grid">
+          <div><strong>Key:</strong> ${song.music_key || "?"}</div>
+          <div><strong>Rhythm:</strong> ${song.rhythm || "?"}</div>
+          <div><strong>Page:</strong> ${song.page || "-"}</div>
+          <div><strong>Tags:</strong> ${song.tags || "-"}</div>
+          <div><strong>Categories:</strong> ${song.categories || "-"}</div>
+          <div><strong>Published:</strong> ${song.published || "-"}</div>
+        </div>
+        ${song.video ? `<a class="video-link" href="${song.video}" target="_blank" rel="noreferrer">▶ Watch</a>` : ""}
+        <div class="lyrics" id="lyrics">${lyricsHtml}</div>
       `;
 
       const def = getPlaylistById(defaultPlaylistId);
@@ -379,6 +495,7 @@
         if (idx !== -1) playlistIndex = idx;
       }
 
+      bindCardControls();
       updateNavButtons();
     };
 
@@ -404,10 +521,10 @@
         li.onclick = (e) => {
           if ((e.target).classList.contains("add-btn")) return;
           renderSong(song);
-          if (window.innerWidth <= 900 && !appEl.classList.contains("list-hidden")) {
-            appEl.classList.add("list-hidden");
-            toggleListBtn.textContent = "Show songs";
-          }
+      if (window.innerWidth <= 900 && !appEl.classList.contains("list-hidden")) {
+        appEl.classList.add("list-hidden");
+        syncToggleListLabel();
+      }
         };
         listEl.appendChild(li);
       });
@@ -621,20 +738,23 @@
       tabSongsBtn.onclick = () => toggleTabs("songs");
       tabPlaylistsBtn.onclick = () => { toggleTabs("playlists"); renderPlaylists(); };
 
-      toggleListBtn.addEventListener("click", () => {
-        const hidden = appEl.classList.toggle("list-hidden");
-        toggleListBtn.textContent = hidden ? "Show songs" : "Hide songs";
-      });
-
       window.addEventListener("resize", () => {
         if (window.innerWidth > 900) {
           appEl.classList.remove("list-hidden");
-          toggleListBtn.textContent = "Hide songs";
+          syncToggleListLabel();
         }
       });
 
-      prevBtn.addEventListener("click", () => goToPlaylistSong(-1));
-      nextBtn.addEventListener("click", () => goToPlaylistSong(1));
+      prevBtn.addEventListener("click", () => {
+        goToPlaylistSong(-1);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        setTimeout(updateScrollIndicators, 100);
+      });
+      nextBtn.addEventListener("click", () => {
+        goToPlaylistSong(1);
+        window.scrollTo({ top: 0, behavior: "smooth" });
+        setTimeout(updateScrollIndicators, 100);
+      });
 
       toastActionBtn.onclick = openModal;
 
@@ -660,6 +780,21 @@
       modalEl.addEventListener("click", (e) => {
         if (e.target === modalEl) closeModal();
       });
+
+      document.addEventListener("scroll", updateScrollIndicators, { passive: true });
+      document.addEventListener("keydown", (e) => {
+        const tag = (e.target.tagName || "").toLowerCase();
+        if (tag === "input" || tag === "textarea" || e.target.isContentEditable) return;
+        if (e.key === "Enter") {
+          e.preventDefault();
+          window.scrollBy({ top: scrollStep, behavior: "smooth" });
+          setTimeout(updateScrollIndicators, 100);
+        } else if (e.code === "Space") {
+          e.preventDefault();
+          window.scrollBy({ top: -scrollStep, behavior: "smooth" });
+          setTimeout(updateScrollIndicators, 100);
+        }
+      });
     };
 
     const loadSongs = async () => {
@@ -679,6 +814,7 @@
       loadSongs();
       renderPlaylists();
       updateNavButtons();
+      updateScrollIndicators();
     };
 
     init();
