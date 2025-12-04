@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <title>Songbook with Chords</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" href="manifest.webmanifest">
   <style>
     :root {
       --bg: #0f172a;
@@ -816,6 +818,12 @@
       updateNavButtons();
       updateScrollIndicators();
     };
+
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("sw.js").catch(console.error);
+      });
+    }
 
     init();
   </script>
