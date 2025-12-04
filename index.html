@@ -143,11 +143,12 @@
     .lyrics { margin-top: 18px; font-size: 16px; display: flex; flex-direction: column; gap: 6px; }
     .line { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 2px; white-space: pre-wrap; }
     .line.empty { height: 12px; }
-    .chord-wrap { display: inline-flex; flex-direction: column; position: relative; padding-top: 16px; border-bottom: 1px solid #666; line-height: 2.35; }
+    .line.bold-line { font-weight: 700; }
+    .chord-wrap { display: inline-flex; flex-direction: column; position: relative; padding-top: 16px;  line-height: 2.35; }
     .chord-wrap + .chord-wrap { margin-left: 0; }
     .chord-badge { position: absolute; top: 0; left: 0; display: inline-block; padding: 2px 5px; background: #f5d5b8; color: #0f172a; font-weight: 700; font-size: 0.85em; border-radius: 4px; line-height: 1; white-space: nowrap; }
-    .lyric-text { color: var(--text); white-space: pre; padding-left: 4px; }
-    .chunk-plain { display: inline-block; color: var(--text); white-space: pre; line-height: 1.6; }
+    .lyric-text { color: var(--text); white-space: pre; }
+    .chunk-plain { display: inline-block; color: var(--text); white-space: pre; line-height: 2.35; }
 
     .video-link { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); text-decoration: none; font-weight: 600; margin-top: 10px; }
     .empty-state { color: var(--muted); font-style: italic; }
@@ -409,7 +410,9 @@
       return lines
         .map((line) => {
           if (line.trim() === "") return '<div class="line empty">&nbsp;</div>';
-          const chunks = lineToChunks(line);
+          const isBold = line.trimStart().startsWith("*");
+          const cleanLine = isBold ? line.replace(/^\s*\*/, "") : line;
+          const chunks = lineToChunks(cleanLine);
           const parts = chunks
             .map(({ chord, text }) => {
               const safeText = escapeHtml(text || "");
@@ -419,7 +422,7 @@
               return `<span class="chord-wrap"><span class="chord-badge">${chordText}</span><span class="lyric-text">${lyricText}</span></span>`;
             })
             .join("");
-          return `<div class="line">${parts}</div>`;
+          return `<div class="line${isBold ? " bold-line" : ""}">${parts}</div>`;
         })
         .join("");
     };
