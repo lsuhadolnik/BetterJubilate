@@ -263,7 +263,7 @@
     <button id="toast-action" class="mini-btn">Change playlist</button>
   </div>
 
-  <div class="version-badge">v0.2.0</div>
+  <div class="version-badge">v0.3.0</div>
 
   <div class="overlay" id="playlist-modal">
     <div class="modal">
@@ -311,6 +311,7 @@
     let toastTimeout;
     let fontScale = 1;
     let scrollStep = 140;
+    let wakeLock = null;
 
     const chordRegex = /\{\{([^{}]+)\}\}|\{([^{}]+)\}/g;
 
@@ -344,6 +345,16 @@
       if (!versionEl) return;
       const hidden = appEl.classList.contains("list-hidden");
       versionEl.classList.toggle("version-hidden", hidden);
+    };
+
+    const requestWakeLock = async () => {
+      if (!("wakeLock" in navigator)) return;
+      try {
+        wakeLock = await navigator.wakeLock.request("screen");
+        wakeLock.addEventListener("release", () => { wakeLock = null; });
+      } catch (err) {
+        console.warn("WakeLock request failed", err);
+      }
     };
 
     const updateScrollIndicators = () => {};
@@ -811,6 +822,10 @@
           setTimeout(updateScrollIndicators, 100);
         }
       });
+
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) requestWakeLock();
+      });
     };
 
     const loadSongs = async () => {
@@ -835,6 +850,7 @@
       updateNavButtons();
       updateScrollIndicators();
       updateVersionVisibility();
+      requestWakeLock();
     };
 
     if ("serviceWorker" in navigator) {

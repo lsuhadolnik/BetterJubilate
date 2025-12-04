@@ -15,10 +15,12 @@ Then open `http://localhost:8000/`.
 - Works over `http://localhost` or HTTPS. Reload once online to warm the cache; then it will work offline.
 
 ## Features
-- Song list with search (tags/categories included).
-- Song view with chords above lyrics, font-size controls, quick scroll hotkeys (Enter down, Space up), scroll-step input, and list toggle.
+- Song list with search (tags/categories + chord-stripped lyric search).
+- Song view with chords above lyrics, bold marker lines via leading `*`, font-size controls, quick scroll hotkeys (Enter down, Space up), scroll-step input, and list toggle.
 - Playlist tab: create/select default playlist, add via “+ Add”, reorder/remove entries, prev/next navigation.
+- URL deep-linking: `?song=<id>` opens the song on reload.
 - Mobile: sidebar hidden by default; toggle via header.
+- PWA: offline cache via service worker + installable manifest; wake lock keeps screen on (where supported).
 
 ## Keyboard / Page Turner
 - Enter: scroll down by step (smooth).
