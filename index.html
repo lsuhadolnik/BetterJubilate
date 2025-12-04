@@ -322,6 +322,7 @@
         song.title,
         song.tags,
         song.categories,
+        song.page ? `page ${song.page}` : "",
         stripChords(song.lyrics)
       ]
         .filter(Boolean)
@@ -534,7 +535,7 @@
           <div class="song-line">
             <div>
               <div class="song-title">${song.title}</div>
-              <div class="song-meta">${song.tags || "No tags"}</div>
+              <div class="song-meta">Page ${song.page || "-"} · ${song.tags || "No tags"}</div>
             </div>
             <button class="mini-btn add-btn" data-id="${song.id}">+ Add</button>
           </div>
