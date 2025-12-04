@@ -313,6 +313,20 @@
     let scrollStep = 140;
 
     const chordRegex = /\{\{([^{}]+)\}\}|\{([^{}]+)\}/g;
+
+    const stripChords = (text) => (text || "").replace(chordRegex, " ").replace(/\s+/g, " ");
+
+    const makeSearchText = (song) => {
+      return [
+        song.title,
+        song.tags,
+        song.categories,
+        stripChords(song.lyrics)
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+    };
     const versionEl = document.querySelector(".version-badge");
 
     const applyFontSize = () => {
@@ -663,10 +677,7 @@
       const term = searchEl.value.toLowerCase().trim();
       if (!term) { renderList(songs); return; }
       const filtered = songs.filter((song) => {
-        const haystack = [song.title, song.tags, song.categories]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
+        const haystack = song._search || "";
         return haystack.includes(term);
       });
       renderList(filtered);
@@ -805,7 +816,7 @@
     const loadSongs = async () => {
       try {
         const res = await fetch("JUBILATE.json");
-        songs = await res.json();
+        songs = (await res.json()).map((s) => ({ ...s, _search: makeSearchText(s) }));
         renderList(songs);
         const url = new URL(window.location.href);
         const songParam = url.searchParams.get("song");
