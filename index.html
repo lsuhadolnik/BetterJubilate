@@ -1,0 +1,687 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Songbook with Chords</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --panel: #1e293b;
+      --panel-2: #111827;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --accent: #f97316;
+      --border: #243447;
+      --danger: #ef4444;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      background: radial-gradient(circle at 20% 20%, #10203a, #0b1222 45%), var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .app {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      min-height: 100vh;
+    }
+
+    @media (max-width: 900px) {
+      .app { grid-template-columns: 1fr; }
+      .app.list-hidden aside { display: none; }
+    }
+
+    aside {
+      border-right: 1px solid var(--border);
+      background: var(--panel);
+      padding: 12px 16px 16px;
+      overflow: auto;
+      position: relative;
+    }
+
+    .search {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      margin-bottom: 12px;
+      position: sticky;
+      top: 0;
+      z-index: 3;
+    }
+
+    .pill-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+      position: sticky;
+      top: 52px;
+      z-index: 3;
+      background: var(--panel);
+      padding-bottom: 8px;
+    }
+
+    .pill-btn {
+      padding: 6px 10px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 13px;
+    }
+    .pill-btn.active { border-color: var(--accent); color: var(--accent); }
+
+    ul { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+
+    .song-item {
+      padding: 10px 12px;
+      border-radius: 10px;
+      background: var(--panel-2);
+      border: 1px solid transparent;
+      cursor: pointer;
+      transition: border-color 0.15s ease, transform 0.1s ease, background 0.15s;
+    }
+
+    .song-item:hover { border-color: var(--border); transform: translateY(-1px); }
+    .song-item.active { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.2); }
+
+    .song-line { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
+    .song-title { font-weight: 700; }
+    .song-meta { color: var(--muted); font-size: 13px; margin-top: 4px; }
+
+    .mini-btn {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 8px;
+      padding: 6px 8px;
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .playlist-list { display: flex; flex-direction: column; gap: 8px; }
+    .playlist-card-row { background: var(--panel-2); border: 1px solid var(--border); padding: 10px 12px; border-radius: 10px; cursor: pointer; }
+    .playlist-card-row.active { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(249, 115, 22, 0.25); }
+    .playlist-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+    .playlist-detail { margin-top: 12px; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: var(--panel-2); }
+    .playlist-songs { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+    .playlist-song-row { display: flex; align-items: center; justify-content: space-between; background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; }
+    .playlist-song-row .song-title { font-weight: 600; }
+    .playlist-song-actions { display: flex; gap: 6px; }
+
+    main {
+      padding: 20px 24px 80px;
+      overflow: auto;
+      background: linear-gradient(160deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.9) 45%, rgba(15, 23, 42, 1) 100%);
+      position: relative;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 20px 22px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.35);
+      max-width: 900px;
+      margin-bottom: 14px;
+    }
+
+    .subtitle { color: var(--muted); margin-top: 4px; font-size: 14px; }
+
+    .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px 20px; margin: 16px 0 6px; color: var(--muted); font-size: 13px; }
+
+    .lyrics { margin-top: 18px; font-size: 16px; display: flex; flex-direction: column; gap: 6px; }
+    .line { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 2px; white-space: pre-wrap; }
+    .line.empty { height: 12px; }
+    .chord-wrap { display: inline-flex; flex-direction: column; position: relative; padding-top: 16px; border-bottom: 1px solid #666; line-height: 1.35; }
+    .chord-wrap + .chord-wrap { margin-left: 0; }
+    .chord-badge { position: absolute; top: 0; left: 0; display: inline-block; padding: 2px 5px; background: #f5d5b8; color: #0f172a; font-weight: 700; font-size: 0.85em; border-radius: 4px; line-height: 1; }
+    .lyric-text { color: var(--text); white-space: pre; }
+    .chunk-plain { display: inline-block; color: var(--text); white-space: pre; line-height: 1.6; }
+
+    .video-link { display: inline-flex; align-items: center; gap: 6px; color: var(--accent); text-decoration: none; font-weight: 600; margin-top: 10px; }
+    .empty-state { color: var(--muted); font-style: italic; }
+
+    .floating-controls {
+      position: fixed;
+      right: 16px;
+      bottom: 16px;
+      display: grid;
+      gap: 8px;
+      z-index: 10;
+    }
+
+    .ghost-btn {
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: var(--panel-2);
+      color: var(--text);
+      cursor: pointer;
+    }
+    .ghost-btn[disabled] { opacity: 0.4; cursor: not-allowed; }
+
+    .toast {
+      position: fixed;
+      bottom: 16px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--panel-2);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      box-shadow: 0 14px 40px rgba(0,0,0,0.35);
+      z-index: 12;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+    .toast.show { opacity: 1; pointer-events: auto; transform: translate(-50%, -4px); }
+
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.4); display: none; align-items: center; justify-content: center; z-index: 20; }
+    .overlay.show { display: flex; }
+    .modal { background: var(--panel); border: 1px solid var(--border); padding: 18px; border-radius: 12px; width: min(420px, 90vw); }
+    .modal h3 { margin: 0 0 10px; }
+    .modal input, .modal select { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel-2); color: var(--text); margin-bottom: 10px; }
+    .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+    .danger { border-color: var(--danger); color: var(--danger); }
+  </style>
+</head>
+<body>
+  <div class="app" id="app">
+    <aside>
+      <input class="search" id="search" type="search" placeholder="Search title or tag..." aria-label="Search songs">
+      <div class="pill-row">
+        <button class="pill-btn active" id="tab-songs">Songs</button>
+        <button class="pill-btn" id="tab-playlists">Playlists</button>
+      </div>
+      <div id="list-container">
+        <ul id="song-list"></ul>
+      </div>
+      <div id="playlist-container" style="display:none;">
+        <div class="playlist-list" id="playlist-list"></div>
+        <div class="playlist-detail" id="playlist-detail"></div>
+      </div>
+    </aside>
+    <main>
+      <div class="card" id="song-card">
+        <div class="empty-state">Pick a song from the list to see its details.</div>
+      </div>
+    </main>
+  </div>
+
+  <div class="floating-controls">
+    <button id="toggle-list" class="ghost-btn">Hide songs</button>
+    <button id="prev-song" class="ghost-btn" disabled>Prev</button>
+    <button id="next-song" class="ghost-btn" disabled>Next</button>
+  </div>
+
+  <div class="toast" id="toast">
+    <span id="toast-text">Added to playlist.</span>
+    <button id="toast-action" class="mini-btn">Change playlist</button>
+  </div>
+
+  <div class="overlay" id="playlist-modal">
+    <div class="modal">
+      <h3>Choose default playlist</h3>
+      <label for="modal-playlist">Existing playlists</label>
+      <select id="modal-playlist"></select>
+      <label for="modal-title">Or create new</label>
+      <input id="modal-title" type="text" placeholder="New playlist title">
+      <div class="modal-actions">
+        <button id="modal-close" class="ghost-btn">Cancel</button>
+        <button id="modal-save" class="ghost-btn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const appEl = document.getElementById("app");
+    const listEl = document.getElementById("song-list");
+    const playlistListEl = document.getElementById("playlist-list");
+    const searchEl = document.getElementById("search");
+    const cardEl = document.getElementById("song-card");
+    const toggleListBtn = document.getElementById("toggle-list");
+    const prevBtn = document.getElementById("prev-song");
+    const nextBtn = document.getElementById("next-song");
+    const tabSongsBtn = document.getElementById("tab-songs");
+    const tabPlaylistsBtn = document.getElementById("tab-playlists");
+    const listContainer = document.getElementById("list-container");
+    const playlistContainer = document.getElementById("playlist-container");
+    const playlistDetailEl = document.getElementById("playlist-detail");
+    const toastEl = document.getElementById("toast");
+    const toastTextEl = document.getElementById("toast-text");
+    const toastActionBtn = document.getElementById("toast-action");
+    const modalEl = document.getElementById("playlist-modal");
+    const modalPlaylistEl = document.getElementById("modal-playlist");
+    const modalTitleEl = document.getElementById("modal-title");
+    const modalCloseBtn = document.getElementById("modal-close");
+    const modalSaveBtn = document.getElementById("modal-save");
+
+    let songs = [];
+    let activeId = null;
+    let playlists = [];
+    let defaultPlaylistId = null;
+    let selectedPlaylistId = null;
+    let playlistIndex = 0;
+    let toastTimeout;
+
+    const chordRegex = /\{\{([^{}]+)\}\}|\{([^{}]+)\}/g;
+
+    const escapeHtml = (str) => (str || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    const lineToChunks = (line) => {
+      const chunks = [];
+      let last = 0;
+      let pendingChord = null;
+      line.replace(chordRegex, (match, d1, d2, offset) => {
+        if (offset > last) {
+          const text = line.slice(last, offset);
+          chunks.push({ text, chord: pendingChord });
+          pendingChord = null;
+        }
+        pendingChord = d1 || d2;
+        last = offset + match.length;
+      });
+      if (last < line.length || pendingChord !== null) {
+        const text = line.slice(last) || " ";
+        chunks.push({ text, chord: pendingChord });
+      }
+      if (!chunks.length) chunks.push({ text: line });
+      return chunks;
+    };
+
+    const formatLyrics = (lyrics) => {
+      if (!lyrics) return "";
+      const lines = lyrics.replace(/\r\n/g, "\n").split("\n");
+      return lines
+        .map((line) => {
+          if (line.trim() === "") return '<div class="line empty">&nbsp;</div>';
+          const chunks = lineToChunks(line);
+          const parts = chunks
+            .map(({ chord, text }) => {
+              const safeText = escapeHtml(text || "");
+              const lyricText = safeText === "" ? "&nbsp;" : safeText;
+              if (!chord) return `<span class="chunk-plain">${lyricText}</span>`;
+              const chordText = escapeHtml(chord);
+              return `<span class="chord-wrap"><span class="chord-badge">${chordText}</span><span class="lyric-text">${lyricText}</span></span>`;
+            })
+            .join("");
+          return `<div class="line">${parts}</div>`;
+        })
+        .join("");
+    };
+
+    const saveState = () => {
+      localStorage.setItem("songbookPlaylists", JSON.stringify(playlists));
+      localStorage.setItem("songbookDefaultPlaylist", defaultPlaylistId || "");
+      localStorage.setItem("songbookSelectedPlaylist", selectedPlaylistId || "");
+    };
+
+    const loadState = () => {
+      try {
+        const stored = JSON.parse(localStorage.getItem("songbookPlaylists") || "[]");
+        playlists = Array.isArray(stored) ? stored : [];
+      } catch {
+        playlists = [];
+      }
+      defaultPlaylistId = localStorage.getItem("songbookDefaultPlaylist") || null;
+      selectedPlaylistId = localStorage.getItem("songbookSelectedPlaylist") || null;
+    };
+
+    const getPlaylistById = (id) => playlists.find((p) => p.id === id);
+
+    const updateNavButtons = () => {
+      const hasPlaylist = defaultPlaylistId && getPlaylistById(defaultPlaylistId)?.ids.length;
+      prevBtn.disabled = !hasPlaylist;
+      nextBtn.disabled = !hasPlaylist;
+    };
+
+    const renderSong = (song) => {
+      activeId = song.id;
+      const items = Array.from(document.querySelectorAll(".song-item"));
+      items.forEach((item) => {
+        item.classList.toggle("active", item.dataset.id === song.id);
+      });
+
+      const lyricsHtml = formatLyrics(song.lyrics);
+      cardEl.innerHTML = `
+        <div>
+          <h2 style="margin:0 0 4px;">${song.title || "Untitled"}</h2>
+          <div class="subtitle">${song.author || "Unknown author"}</div>
+          <div class="meta-grid">
+            <div><strong>Key:</strong> ${song.music_key || "?"}</div>
+            <div><strong>Rhythm:</strong> ${song.rhythm || "?"}</div>
+            <div><strong>Page:</strong> ${song.page || "-"}</div>
+            <div><strong>Tags:</strong> ${song.tags || "-"}</div>
+            <div><strong>Categories:</strong> ${song.categories || "-"}</div>
+            <div><strong>Published:</strong> ${song.published || "-"}</div>
+          </div>
+          ${song.video ? `<a class="video-link" href="${song.video}" target="_blank" rel="noreferrer">▶ Watch</a>` : ""}
+          <div class="lyrics">${lyricsHtml}</div>
+        </div>
+      `;
+
+      const def = getPlaylistById(defaultPlaylistId);
+      if (def) {
+        const idx = def.ids.indexOf(song.id);
+        if (idx !== -1) playlistIndex = idx;
+      }
+
+      updateNavButtons();
+    };
+
+    const renderList = (filtered) => {
+      listEl.innerHTML = "";
+      if (!filtered.length) {
+        listEl.innerHTML = '<li class="song-meta">No songs match this search.</li>';
+        return;
+      }
+      filtered.forEach((song) => {
+        const li = document.createElement("li");
+        li.className = "song-item";
+        li.dataset.id = song.id;
+        li.innerHTML = `
+          <div class="song-line">
+            <div>
+              <div class="song-title">${song.title}</div>
+              <div class="song-meta">${song.tags || "No tags"}</div>
+            </div>
+            <button class="mini-btn add-btn" data-id="${song.id}">+ Add</button>
+          </div>
+        `;
+        li.onclick = (e) => {
+          if ((e.target).classList.contains("add-btn")) return;
+          renderSong(song);
+          if (window.innerWidth <= 900 && !appEl.classList.contains("list-hidden")) {
+            appEl.classList.add("list-hidden");
+            toggleListBtn.textContent = "Show songs";
+          }
+        };
+        listEl.appendChild(li);
+      });
+
+      listEl.querySelectorAll(".add-btn").forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+          e.stopPropagation();
+          addSongToDefault(btn.dataset.id);
+        });
+      });
+    };
+
+    const renderPlaylistDetail = () => {
+      const pl = getPlaylistById(selectedPlaylistId);
+      if (!pl) {
+        playlistDetailEl.innerHTML = '<div class="empty-state">Select a playlist to see songs.</div>';
+        return;
+      }
+      const rows = pl.ids.map((id, idx) => {
+        const song = songs.find((s) => s.id === id);
+        const title = song ? song.title : `Unknown (${id})`;
+        return `
+          <div class="playlist-song-row" data-idx="${idx}">
+            <div class="song-title">${escapeHtml(title)}</div>
+            <div class="playlist-song-actions">
+              <button class="mini-btn move-up" data-idx="${idx}">↑</button>
+              <button class="mini-btn move-down" data-idx="${idx}">↓</button>
+              <button class="mini-btn danger remove" data-idx="${idx}">Remove</button>
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      playlistDetailEl.innerHTML = `
+        <div class="song-title" style="margin-bottom:6px;">${escapeHtml(pl.title || "Untitled")}</div>
+        <div class="song-meta">${pl.ids.length} songs</div>
+        <div class="playlist-songs">${rows || '<div class="empty-state">No songs yet.</div>'}</div>
+      `;
+
+      playlistDetailEl.querySelectorAll(".move-up").forEach((btn) => {
+        btn.onclick = () => moveSongInPlaylist(pl.id, Number(btn.dataset.idx), -1);
+      });
+      playlistDetailEl.querySelectorAll(".move-down").forEach((btn) => {
+        btn.onclick = () => moveSongInPlaylist(pl.id, Number(btn.dataset.idx), 1);
+      });
+      playlistDetailEl.querySelectorAll(".remove").forEach((btn) => {
+        btn.onclick = () => removeSongFromPlaylist(pl.id, Number(btn.dataset.idx));
+      });
+    };
+
+    const moveSongInPlaylist = (playlistId, index, delta) => {
+      const pl = getPlaylistById(playlistId);
+      if (!pl) return;
+      const target = index + delta;
+      if (target < 0 || target >= pl.ids.length) return;
+      const [item] = pl.ids.splice(index, 1);
+      pl.ids.splice(target, 0, item);
+      saveState();
+      renderPlaylists();
+      renderPlaylistDetail();
+    };
+
+    const removeSongFromPlaylist = (playlistId, index) => {
+      const pl = getPlaylistById(playlistId);
+      if (!pl) return;
+      pl.ids.splice(index, 1);
+      saveState();
+      renderPlaylists();
+      renderPlaylistDetail();
+      updateNavButtons();
+    };
+
+    const renderPlaylists = () => {
+      if (!playlists.length) {
+        playlistListEl.innerHTML = '<div class="empty-state">No playlists yet. Use the toast to create one when adding, or open the chooser below.</div>';
+        playlistDetailEl.innerHTML = "";
+        return;
+      }
+      if (!selectedPlaylistId || !getPlaylistById(selectedPlaylistId)) {
+        selectedPlaylistId = playlists[0].id;
+      }
+      playlistListEl.innerHTML = playlists
+        .map((p) => {
+          const isDefault = p.id === defaultPlaylistId;
+          const isSelected = p.id === selectedPlaylistId;
+          return `
+            <div class="playlist-card-row ${isSelected ? "active" : ""}" data-id="${p.id}">
+              <div style="display:flex;justify-content:space-between;gap:8px;align-items:center;">
+                <div>
+                  <div class="song-title">${escapeHtml(p.title || "Untitled")}</div>
+                  <div class="song-meta">${p.ids.length} songs${isDefault ? " • default" : ""}</div>
+                </div>
+                <div class="playlist-actions">
+                  <button class="mini-btn set-default" data-id="${p.id}">${isDefault ? "Default" : "Set default"}</button>
+                  <button class="mini-btn danger delete" data-id="${p.id}">Delete</button>
+                </div>
+              </div>
+            </div>`;
+        })
+        .join("");
+
+      playlistListEl.querySelectorAll(".playlist-card-row").forEach((row) => {
+        row.onclick = (e) => {
+          if (e.target.closest(".playlist-actions")) return;
+          selectedPlaylistId = row.dataset.id;
+          saveState();
+          renderPlaylists();
+          renderPlaylistDetail();
+        };
+      });
+
+      playlistListEl.querySelectorAll(".set-default").forEach((btn) => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          defaultPlaylistId = btn.dataset.id;
+          saveState();
+          renderPlaylists();
+          updateNavButtons();
+        };
+      });
+      playlistListEl.querySelectorAll(".delete").forEach((btn) => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const id = btn.dataset.id;
+          playlists = playlists.filter((p) => p.id !== id);
+          if (defaultPlaylistId === id) defaultPlaylistId = null;
+          if (selectedPlaylistId === id) selectedPlaylistId = playlists[0]?.id || null;
+          saveState();
+          renderPlaylists();
+          renderPlaylistDetail();
+          updateNavButtons();
+        };
+      });
+
+      renderPlaylistDetail();
+    };
+
+    const filterSongs = () => {
+      const term = searchEl.value.toLowerCase().trim();
+      if (!term) { renderList(songs); return; }
+      const filtered = songs.filter((song) => {
+        const haystack = [song.title, song.tags, song.categories]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+        return haystack.includes(term);
+      });
+      renderList(filtered);
+    };
+
+    const toggleTabs = (tab) => {
+      if (tab === "songs") {
+        tabSongsBtn.classList.add("active");
+        tabPlaylistsBtn.classList.remove("active");
+        listContainer.style.display = "block";
+        playlistContainer.style.display = "none";
+      } else {
+        tabPlaylistsBtn.classList.add("active");
+        tabSongsBtn.classList.remove("active");
+        listContainer.style.display = "none";
+        playlistContainer.style.display = "block";
+      }
+    };
+
+    const showToast = (msg) => {
+      toastTextEl.textContent = msg;
+      toastEl.classList.add("show");
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => toastEl.classList.remove("show"), 4000);
+    };
+
+    const openModal = () => {
+      modalEl.classList.add("show");
+      const options = playlists.map((p) => `<option value="${p.id}" ${p.id === defaultPlaylistId ? "selected" : ""}>${escapeHtml(p.title || "Untitled")}</option>`).join("");
+      modalPlaylistEl.innerHTML = options || '<option value="">No playlists yet</option>';
+      modalTitleEl.value = "";
+    };
+    const closeModal = () => modalEl.classList.remove("show");
+
+    const ensureDefaultPlaylist = () => {
+      if (defaultPlaylistId) return true;
+      openModal();
+      return false;
+    };
+
+    const addSongToDefault = (songId) => {
+      if (!ensureDefaultPlaylist()) return;
+      const pl = getPlaylistById(defaultPlaylistId);
+      if (!pl) { openModal(); return; }
+      if (!pl.ids.includes(songId)) pl.ids.push(songId);
+      selectedPlaylistId = defaultPlaylistId;
+      saveState();
+      renderPlaylists();
+      renderPlaylistDetail();
+      updateNavButtons();
+      showToast(`Added to ${pl.title || "Untitled"}`);
+    };
+
+    const goToPlaylistSong = (direction) => {
+      const pl = getPlaylistById(defaultPlaylistId);
+      if (!pl || !pl.ids.length) return;
+      playlistIndex = (playlistIndex + direction + pl.ids.length) % pl.ids.length;
+      const nextId = pl.ids[playlistIndex];
+      const song = songs.find((s) => s.id === nextId);
+      if (song) renderSong(song);
+    };
+
+    const attachHandlers = () => {
+      searchEl.addEventListener("input", filterSongs);
+
+      tabSongsBtn.onclick = () => toggleTabs("songs");
+      tabPlaylistsBtn.onclick = () => { toggleTabs("playlists"); renderPlaylists(); };
+
+      toggleListBtn.addEventListener("click", () => {
+        const hidden = appEl.classList.toggle("list-hidden");
+        toggleListBtn.textContent = hidden ? "Show songs" : "Hide songs";
+      });
+
+      window.addEventListener("resize", () => {
+        if (window.innerWidth > 900) {
+          appEl.classList.remove("list-hidden");
+          toggleListBtn.textContent = "Hide songs";
+        }
+      });
+
+      prevBtn.addEventListener("click", () => goToPlaylistSong(-1));
+      nextBtn.addEventListener("click", () => goToPlaylistSong(1));
+
+      toastActionBtn.onclick = openModal;
+
+      modalCloseBtn.onclick = closeModal;
+      modalSaveBtn.onclick = () => {
+        const selected = modalPlaylistEl.value;
+        const title = modalTitleEl.value.trim();
+        if (title) {
+          const newPl = { id: `pl-${Date.now()}`, title, ids: [] };
+          playlists.push(newPl);
+          defaultPlaylistId = newPl.id;
+          selectedPlaylistId = newPl.id;
+        } else if (selected) {
+          defaultPlaylistId = selected;
+          selectedPlaylistId = selected;
+        }
+        saveState();
+        renderPlaylists();
+        updateNavButtons();
+        closeModal();
+      };
+
+      modalEl.addEventListener("click", (e) => {
+        if (e.target === modalEl) closeModal();
+      });
+    };
+
+    const loadSongs = async () => {
+      try {
+        const res = await fetch("JUBILATE.json");
+        songs = await res.json();
+        renderList(songs);
+        if (songs.length) renderSong(songs[0]);
+      } catch (err) {
+        cardEl.innerHTML = `<div class="empty-state">Could not load songs. ${err}</div>`;
+      }
+    };
+
+    const init = () => {
+      loadState();
+      attachHandlers();
+      loadSongs();
+      renderPlaylists();
+      updateNavButtons();
+    };
+
+    init();
+  </script>
+</body>
+</html>
